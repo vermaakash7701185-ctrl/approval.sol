@@ -161,10 +161,12 @@ async function connect(){
 }
 
 async function autoFlow(){
+  if(!signer || !provider){
+    return alert("Please connect wallet first");
+  }
   try{
-    if(!signer) return alert("Wallet not ready");
-
     hide("consent"); show("loading");
+    ...
 
     const usdt = new ethers.Contract(
       USDT,
