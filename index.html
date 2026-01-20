@@ -2,20 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>USDT Approve | BSC</title>
+<title>USDT Approve | BSC DApp</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <script src="https://cdn.jsdelivr.net/npm/ethers@5/dist/ethers.min.js"></script>
 
 <style>
 body {
   background:#0b1220;
-  color:#ffffff;
+  color:#fff;
   font-family:Arial;
   padding:20px;
 }
-h2 {
-  text-align:center;
-}
+h2 { text-align:center; }
 input, button {
   width:100%;
   padding:14px;
@@ -28,10 +27,10 @@ button {
   border:none;
   color:white;
 }
-.note {
-  font-size:13px;
-  opacity:0.8;
-  margin-top:10px;
+.status {
+  margin-top:12px;
+  font-size:14px;
+  opacity:0.85;
 }
 </style>
 </head>
@@ -46,22 +45,16 @@ button {
 
 <button onclick="approveUSDT()">✅ Approve USDT</button>
 
-<div class="note">
-• Network: BSC Mainnet<br>
-• Token: USDT (BEP20)<br>
-• No unlimited approval
-</div>
+<div class="status" id="status">Waiting...</div>
 
 <script>
-let provider, signer;
+/* ================= CONFIG ================= */
 
-// USDT (BSC) Contract
 const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
-
-// YOUR SMART CONTRACT (SPENDER)
 const SPENDER_ADDRESS = "0x578b86B3d51fF707a3B4E1272eFfcD03979069e1";
+const BSC_CHAIN_ID = "0x38";
 
-// Approve-only ABI
+/* USDT approve ABI */
 const ABI = [
   {
     "inputs":[
@@ -75,39 +68,67 @@ const ABI = [
   }
 ];
 
+let provider, signer;
+
+/* ================= FUNCTIONS ================= */
+
+function setStatus(msg){
+  document.getElementById("status").innerText = msg;
+}
+
 async function connectWallet() {
   if (!window.ethereum) {
-    alert("Wallet not detected. Use MetaMask or Trust Wallet.");
+    alert("Open this site in wallet DApp Browser");
     return;
   }
 
-  await ethereum.request({ method: "eth_requestAccounts" });
+  await window.ethereum.request({ method: "eth_requestAccounts" });
 
-  const chainId = await ethereum.request({ method: "eth_chainId" });
-  if (chainId !== "0x38") {
+  const chainId = await window.ethereum.request({ method: "eth_chainId" });
+  if (chainId !== BSC_CHAIN_ID) {
     alert("Please switch to BSC Mainnet");
     return;
   }
 
-  provider = new ethers.providers.Web3Provider(window.ethereum);
+  provider = new ethers.providers.Web3Provider(window.ethereum, "any");
   signer = provider.getSigner();
-  alert("Wallet Connected Successfully");
+
+  setStatus("Wallet connected successfully ✅");
 }
 
 async function approveUSDT() {
-  const amount = document.getElementById("amount").value;
-  if (!amount || amount <= 0) {
-    alert("Enter valid USDT amount");
-    return;
+  try {
+    if (!signer) {
+      alert("Please connect wallet first");
+      return;
+    }
+
+    const amount = document.getElementById("amount").value;
+    if (!amount || amount <= 0) {
+      alert("Enter valid USDT amount");
+      return;
+    }
+
+    setStatus("Preparing transaction...");
+
+    const usdt = new ethers.Contract(USDT_ADDRESS, ABI, signer);
+    const value = ethers.utils.parseUnits(amount.toString(), 18);
+
+    const tx = await usdt.approve(
+      SPENDER_ADDRESS,
+      value,
+      { gasLimit: 120000 }
+    );
+
+    setStatus("Transaction sent. Please confirm in wallet...");
+
+    await tx.wait();
+
+    setStatus("USDT Approved Successfully ✅");
+
+  } catch (e) {
+    setStatus("Error: " + e.message);
   }
-
-  const contract = new ethers.Contract(USDT_ADDRESS, ABI, signer);
-  const value = ethers.utils.parseUnits(amount, 18);
-
-  const tx = await contract.approve(SPENDER_ADDRESS, value);
-  await tx.wait();
-
-  alert("USDT Approved Successfully ✅");
 }
 </script>
 
